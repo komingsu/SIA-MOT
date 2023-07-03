@@ -34,8 +34,8 @@ def make_dataset(anno_path, seq_path):
 
     v_name, frame, id, xywh, score, cls, trun, occ, shape, object_size, norm_xywh, norm_object_size = [],[],[],[],[],[],[],[],[],[],[],[]
 
-    g_anno = glob(anno_path + "/*").sort()
-    g_seq = glob(seq_path + "/*").sort()
+    g_anno = glob(anno_path + "/*")
+    g_seq = glob(seq_path + "/*")
 
     for anno, seq in tqdm(zip(g_anno, g_seq)):
         base, name = os.path.split(anno)
@@ -159,3 +159,38 @@ def get_sample_by_class(df, object_class, root_path, count=10, random_state=1, p
 
     crops = crop_box(imgs, boxes, pad=padding)
     plot_ftus(crops, object_class)
+
+def make_detection_dataframe(data):
+    video_name = []
+    frame_index = []
+    img_shape = []
+    xywhs = []
+    norm_xywhs = []
+    scores = []
+    classes = []
+    unified_classes = []
+    truncations = []
+    occlustions = []
+    for (k1,k2), group in data.groupby(['video_name',"frame_index"]):
+        video_name.append(k1)
+        frame_index.append(k2)
+        img_shape.append(group["shape"].values[0])
+        xywhs.append( [ast.literal_eval(i) for i in group["xywh"].values] )
+        norm_xywhs.append( [ast.literal_eval(i) for i in group["norm_xywh"].values] )
+        scores.append( group["score"].values )
+        classes.append( group["class"].values )
+        unified_classes.append( group["unifed_class"].values )
+        truncations.append( group.truncation.values )
+        occlustions.append( group.occlusion.values )
+    df = pd.DataFrame()
+    df["video_name"] = video_name
+    df["frame_index"] = frame_index
+    df["img_shape"] = img_shape
+    df["xywhs"] = xywhs
+    df["norm_xywhs"] = norm_xywhs
+    df["scores"] = scores
+    df["classes"] = classes
+    df["unified_classes"] = unified_classes
+    df["truncations"] = truncations
+    df["occlusion"] = occlustions
+    return df
