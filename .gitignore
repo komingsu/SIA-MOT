@@ -1,2 +1,4 @@
-
+*checkpoint*
 *.csv
+*.pyc
+*.weights
