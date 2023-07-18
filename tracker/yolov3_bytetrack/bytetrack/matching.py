@@ -6,7 +6,11 @@ import lap
 from scipy.spatial.distance import cdist
 
 from cython_bbox import bbox_overlaps as bbox_ious
+<<<<<<< HEAD
 import kalman_filter
+=======
+from . import kalman_filter
+>>>>>>> 67b0ebc8c9f518a4aeb88273723b6cb83cfd2210
 import time
 
 '''
@@ -187,4 +191,8 @@ def fuse_score(cost_matrix, detections):
     det_scores = np.expand_dims(det_scores, axis=0).repeat(cost_matrix.shape[0], axis=0)
     fuse_sim = iou_sim * det_scores
     fuse_cost = 1 - fuse_sim
+<<<<<<< HEAD
     return fuse_cost
+=======
+    return fuse_cost
+>>>>>>> 67b0ebc8c9f518a4aeb88273723b6cb83cfd2210

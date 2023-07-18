@@ -1,5 +1,8 @@
 # %%
+<<<<<<< HEAD
 from onemetric.cv.utils.iou import box_iou_batch # pip install onemetric
+=======
+>>>>>>> 67b0ebc8c9f518a4aeb88273723b6cb83cfd2210
 
 import numpy as np
 
@@ -43,4 +46,8 @@ def convert_boxes(image, boxes):
         box = box.tolist()
         if box != [0,0,0,0]:
             returned_boxes.append(box)
+<<<<<<< HEAD
     return returned_boxes
+=======
+    return returned_boxes
+>>>>>>> 67b0ebc8c9f518a4aeb88273723b6cb83cfd2210
