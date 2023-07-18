@@ -1,5 +1,4 @@
 # %%
-from onemetric.cv.utils.iou import box_iou_batch # pip install onemetric
 
 import numpy as np
 
