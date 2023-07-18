@@ -1,66 +1,10 @@
 import os, cv2
 from glob import glob
 import pandas as pd
-import tqdm
+from tqdm.auto import tqdm
 import numpy as np
 import ast
 import matplotlib.pyplot as plt
-import tensorflow as tf
-import ast
-import os, cv2
-
-
-def process_image(image_file):
-    image_string = tf.io.read_file(image_file)
-    try:
-        image_data = tf.image.decode_jpeg(image_string, channels=3)
-        return 0, image_string
-    except tf.errors.InvalidArgumentError:
-        return 1, image_string
-
-
-def make_yolo_example_from_dataframe_row(df):
-    # list의 형태로 담습니다.
-    image_string = tf.io.read_file(df['img_path'])
-
-    if isinstance(image_string, type(tf.constant(0))):  # tensor, eagertensor 이면 꺼낸다
-        image_string = [image_string.numpy()]
-    else:
-        image_string = [image_string]
-
-    # tf.example 생성
-    example = tf.train.Example(features=tf.train.Features(
-        feature={
-            'height':
-            tf.train.Feature(int64_list=tf.train.Int64List(value=[df['height']])),
-            'width':
-            tf.train.Feature(int64_list=tf.train.Int64List(value=[df['width']])),
-            'objectness':
-            tf.train.Feature(int64_list=tf.train.Int64List(value=df["obj"])),
-            'target_id':
-            tf.train.Feature(int64_list=tf.train.Int64List(value=df["target_ids"])),
-            'classes':
-            tf.train.Feature(int64_list=tf.train.Int64List(value=df["classes"])),
-            'x_min':
-            tf.train.Feature(float_list=tf.train.FloatList(value=df['x_min'])),
-            'y_min':
-            tf.train.Feature(float_list=tf.train.FloatList(value=df['y_min'])),
-            'x_max':
-            tf.train.Feature(float_list=tf.train.FloatList(value=df['x_max'])),
-            'y_max':
-            tf.train.Feature(float_list=tf.train.FloatList(value=df['y_max'])), 
-            'image_raw':
-            tf.train.Feature(bytes_list=tf.train.BytesList(value=image_string))
-        }))
-    return example
-
-def activate_list_in_dataframe(df):
-    for i in df.columns:
-        a = df[i].values[0]
-        if type(a) == type("a"):
-            if a.startswith("["):
-                df[i] = df[i].apply(lambda x: ast.literal_eval(x))
-    return df
 
 def make_dataset(anno_path, seq_path):
     """
@@ -83,11 +27,12 @@ def make_dataset(anno_path, seq_path):
             return 2
 
     df = pd.DataFrame(columns=[
-        "video_name", "frame_index", "shape", "target_id", "object_size", "score",
-        "class", "truncation", "occlusion"
+        "video_name", "frame_index", "shape", "target_id", "coco", "norm_coco",
+        "object_size", "norm_object_size", "score", "class", "truncation",
+        "occlusion"
     ])
 
-    v_name, frame, id, score, cls, trun, occ, shape, object_size, norm_object_size, x_min, x_max, x_cen, y_min, y_max, y_cen, bw, bh= [],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+    v_name, frame, id, coco, score, cls, trun, occ, shape, object_size, norm_coco, norm_object_size = [],[],[],[],[],[],[],[],[],[],[],[]
 
     g_anno = glob(anno_path + "/*")
     g_seq = glob(seq_path + "/*")
@@ -112,22 +57,12 @@ def make_dataset(anno_path, seq_path):
                 frame.append(int(line[0]))
                 id.append(int(line[1]))
                 temp_coco = list(map(int, line[2:6]))
-                xmin = temp_coco[0]
-                ymin = temp_coco[1]
-                w = temp_coco[2]
-                h = temp_coco[3]
-                xmax = xmin + w
-                ymax = ymin + h
-                xcen = (xmin + xmax) / 2
-                ycen = (ymin + ymax) / 2
-                x_min.append(xmin)
-                y_min.append(ymin)
-                x_max.append(xmax)
-                y_max.append(ymax)
-                x_cen.append(xcen)
-                y_cen.append(ycen)
-                bw.append(w)
-                bh.append(h)
+                coco.append(temp_coco)
+                nx = temp_coco[0] / img_shape[1]
+                ny = temp_coco[1] / img_shape[0]
+                nw = temp_coco[2] / img_shape[1]
+                nh = temp_coco[3] / img_shape[0]
+                norm_coco.append([nx, ny, nw, nh])
 
                 score.append(int(line[6]))
                 cls.append(int(line[7]))
@@ -135,25 +70,20 @@ def make_dataset(anno_path, seq_path):
                 occ.append(int(line[9]))
                 shape.append(img_shape)
                 object_size.append(temp_coco[2] * temp_coco[3])
+                norm_object_size.append(nw * nh)
 
     df["video_name"] = v_name
     df["frame_index"] = frame
     df["shape"] = shape
     df["target_id"] = id
-    df["x_min"] = x_min
-    df["y_min"] = y_min
-    df["x_max"] = x_max
-    df["y_max"] = y_max  
-    df["x_cen"] = x_cen
-    df["y_cen"] = y_cen
-    df["bw"] = bw
-    df["bh"] = bh 
-
+    df["coco"] = coco
+    df["norm_coco"] = norm_coco
     df["score"] = score
     df["class"] = cls
     df["truncation"] = trun
     df["occlusion"] = occ
     df["object_size"] = object_size
+    df["norm_object_size"] = norm_object_size
     df["unifed_class"] = df["class"].apply(lambda x: cls_unify(x))
     return df
 
@@ -247,40 +177,21 @@ def coco2yolo(boxes):
     return [_coco2yolo(box) for box in boxes]
 
 def make_detection_dataframe(data):
-    target_ids = []
     video_name = []
     frame_index = []
     heigth = []
     width = []
     coco  = []
     classes = []
-    obj=[]
     unified_classes = []
-    x_min = []
-    y_min = []
-    x_max = []
-    y_max = []
-    x_cen = []
-    y_cen = []
-    b_width = []
-    b_height = []
 
     for (k1,k2), group in data.groupby(['video_name',"frame_index"]):
         video_name.append(k1)
         frame_index.append(k2)
         heigth.append(ast.literal_eval(group["shape"].values[0])[0])
-        target_ids.append(group["target_id"].values.tolist())
         width.append(ast.literal_eval(group["shape"].values[0])[1])
-        x_min.append( group["x_min"].values.tolist() )
-        y_min.append( group["y_min"].values.tolist() )
-        x_max.append( group["x_max"].values.tolist() )
-        y_max.append( group["y_max"].values.tolist() )
-        x_cen.append( group["x_cen"].values.tolist() )
-        y_cen.append( group["y_cen"].values.tolist() )
-        b_width.append( group["bw"].values.tolist() )
-        b_height.append( group["bh"].values.tolist() )
+        coco.append( [ast.literal_eval(x) for x in group["coco"].values] )
         classes.append( group["class"].values.tolist() )
-        obj.append( group["score"].values.tolist() )
         unified_classes.append( group["unifed_class"].values.tolist())
     df = pd.DataFrame()
     df["video_name"] = video_name
@@ -290,20 +201,18 @@ def make_detection_dataframe(data):
     for i in range(len(df)):
         img_path_list.append(df["video_name"].values[i] + "/" +str(df["frame_index"].values[i]).zfill(7) +".jpg")
     df["img_path"] = img_path_list
-    df["target_ids"] = target_ids
-    df["x_min"] = x_min
-    df["x_max"] = x_max
-    df["y_min"] = y_min
-    df["y_max"] = y_max
-    df["x_cen"] = x_cen
-    df["y_cen"] = y_cen
-    df["b_width"] = b_width
-    df["b_height"] = b_height
+
+    df["coco"] = coco
+    xyxy_list = []
+    yolo_list = []
+    for i in range(len(df)):
+        xyxy_list.append(coco2xyxy(df["coco"].values[i]))
+        yolo_list.append(coco2yolo(df["coco"].values[i]))
+    df["xyxy"] = xyxy_list
+    df["yolo"] = yolo_list
 
     df["height"] = heigth
     df["width"] = width
     df["classes"] = classes
-    df["obj"] = obj
     df["unified_classes"] = unified_classes
     return df
-
