@@ -33,7 +33,8 @@ class Detection(object):
         self.confidence = float(confidence)
         self.class_name = class_name
         self.feature = np.asarray(feature, dtype=np.float32)
-
+        self.track_id = None
+        
     def get_class(self):
         return self.class_name
 
@@ -52,4 +53,17 @@ class Detection(object):
         ret = self.tlwh.copy()
         ret[:2] += ret[2:] / 2
         ret[2] /= ret[3]
+        return ret
+
+    def add_track_id(self, track_id=None):
+        self.track_id = track_id
+
+     # detection 하나만 바꿔줌
+    def to_xyxy(self):
+        """
+        top left, width, height --> x_min, y_min, x_max, y_max
+        """
+        ret = self.tlwh.copy()
+        ret[2] = ret[0] + ret[2]
+        ret[3] = ret[1] + ret[3]
         return ret
