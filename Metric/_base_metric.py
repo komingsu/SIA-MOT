@@ -1,7 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from .. import _timing
-from ..utils import TrackEvalException
+from _timing import _timing
+from utils import TrackEvalException
 
 
 class _BaseMetric(ABC):
