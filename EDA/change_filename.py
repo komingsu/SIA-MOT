@@ -1,7 +1,7 @@
 import os
 import glob
 from tqdm.auto import tqdm
-
+import config
 """
 visdrone 데이터셋은 다음과 같은 트리구조를 가집니다.
 train
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     dtypes = ["train","val","test"]
     for dtype in dtypes:
         print(f"{dtype} imagefile rename")
-        video_names = glob.glob(f"D:visdrone\VisDrone2019-MOT-{dtype}\sequences\*")
+        video_names = glob.glob(os.path.join(config.DATAPATH,f"VisDrone2019-MOT-{dtype}\sequences\*"))
         for vn in tqdm(video_names):
             video_name = vn.split("\\")[-1]
             file_names = os.listdir(vn)
