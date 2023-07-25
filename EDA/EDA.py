@@ -306,4 +306,3 @@ def make_detection_dataframe(data):
     df["obj"] = obj
     df["unified_classes"] = unified_classes
     return df
-
