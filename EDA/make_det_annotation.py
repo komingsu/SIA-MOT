@@ -1,4 +1,5 @@
 import os, cv2
+import numpy as np
 import glob
 import pandas as pd
 from tqdm.auto import tqdm
@@ -46,6 +47,8 @@ def make_dataset(anno_path, seq_path):
     y_cen= []
     bw= []
     bh= []
+    heights=[]
+    widths=[]
     g_anno = sorted(glob.glob(anno_path + "/*"))
     g_seq = sorted(glob.glob(seq_path + "/*"))
     for anno, seq in tqdm(zip(g_anno, g_seq)):
@@ -79,20 +82,14 @@ def make_dataset(anno_path, seq_path):
 
                 xmax = np.clip(xmin + w,1, width-1)
                 ymax = np.clip(ymin + h,1, height-1)
-                xcen = (xmin + xmax) / 2
-                ycen = (ymin + ymax) / 2
-                w = xmax-xmin
-                h = ymax-ymin
 
                 x_min.append(xmin)
                 y_min.append(ymin)
                 x_max.append(xmax)
                 y_max.append(ymax)
-                x_cen.append(xcen)
-                y_cen.append(ycen)
-                bw.append(w)
-                bh.append(h)
 
+                heights.append(height)
+                widths.append(width)
                 score.append(int(line[6]))
                 classes.append(int(line[7]))
                 trun.append(int(line[8]))
@@ -106,77 +103,63 @@ def make_dataset(anno_path, seq_path):
     df["y_min"] = y_min
     df["x_max"] = x_max
     df["y_max"] = y_max  
-    df["x_cen"] = x_cen
-    df["y_cen"] = y_cen
-    df["bw"] = bw
-    df["bh"] = bh 
 
     df["score"] = score
     df["class"] = classes
     df["truncation"] = trun
     df["occlusion"] = occ
     df["object_size"] = object_size
-
+    df["height"]=heights
+    df["width"]=widths
     return df
 
 def make_detection_dataframe(data):
     target_ids = []
     video_name = []
     frame_index = []
-    heigth = []
+    height = []
     width = []
     coco  = []
     classes = []
-    obj=[]
-    unified_classes = []
     x_min = []
     y_min = []
     x_max = []
     y_max = []
-    x_cen = []
-    y_cen = []
-    b_width = []
-    b_height = []
 
-    for (k1,k2), group in data.groupby(['video_name',"frame_index"]):
+    data = data[data["class"].apply(lambda x: x in [1,2,4])]
+    data = data.reset_index(drop=True)
+    data["class"] = data["class"].apply(lambda x: config.class_change_dict[x])
+
+    for (k1,k2), group in tqdm(data.groupby(['video_name',"frame_index"])):
         video_name.append(k1)
         frame_index.append(k2)
-        heigth.append(group["shape"].values[0][0])
+        height.append(group["height"].values[0])
         target_ids.append(group["target_id"].values.tolist())
-        width.append(group["shape"].values[0][1])
+        width.append(group["width"].values[0])
         x_min.append( group["x_min"].values.tolist() )
         y_min.append( group["y_min"].values.tolist() )
         x_max.append( group["x_max"].values.tolist() )
         y_max.append( group["y_max"].values.tolist() )
-        x_cen.append( group["x_cen"].values.tolist() )
-        y_cen.append( group["y_cen"].values.tolist() )
-        b_width.append( group["bw"].values.tolist() )
-        b_height.append( group["bh"].values.tolist() )
         classes.append( group["class"].values.tolist() )
-        obj.append( group["score"].values.tolist() )
-        unified_classes.append( group["unifed_class"].values.tolist())
     df = pd.DataFrame()
     df["video_name"] = video_name
     df["frame_index"] = frame_index
     
     img_path_list = []
     for i in range(len(df)):
-        img_path_list.append(df["video_name"].values[i] + "/"+df["video_name"].values[i]+"_"+str(df["frame_index"].values[i]).zfill(7) +".jpg")
+        img_path_list.append(
+            seq_path + "/" +
+            df["video_name"].values[i] + "/"+df["video_name"].values[i]+"_"+str(df["frame_index"].values[i]).zfill(7) +".jpg")
     df["img_path"] = img_path_list
     df["target_ids"] = target_ids
     df["x_min"] = x_min
     df["x_max"] = x_max
     df["y_min"] = y_min
     df["y_max"] = y_max
-    df["x_cen"] = x_cen
-    df["y_cen"] = y_cen
-    df["b_width"] = b_width
-    df["b_height"] = b_height
 
-    df["height"] = heigth
+    df["height"] = height
     df["width"] = width
     df["classes"] = classes
-    df["obj"] = obj
     return df
 
 if __name__ =="__main__":
