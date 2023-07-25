@@ -2,3 +2,7 @@
 *.csv
 *.pyc
 *.weights
+*.tfrecord
+*.jpg
+*events*
+*Untitled*
