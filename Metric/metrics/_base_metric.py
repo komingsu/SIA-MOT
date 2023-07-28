@@ -1,8 +1,9 @@
+# import sys
+# sys.path.append('d:/PROJECT/Metric/')
 import numpy as np
 from abc import ABC, abstractmethod
-from .. import _timing
-from ..utils import TrackEvalException
-
+import _timing
+from utils import TrackEvalException
 
 class _BaseMetric(ABC):
     @abstractmethod
